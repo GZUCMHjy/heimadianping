@@ -49,7 +49,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     // 阻塞队列
     private BlockingQueue<VoucherOrder>  orderTasks = new ArrayBlockingQueue<>(1024 * 1024);
 
-    // 创建父线程的一个线程
+    // 在父线程创建线程池，且线程池里面有一个子线程
     private static final ExecutorService SECKILL_ORDER_EXECUTOR = Executors.newSingleThreadExecutor();
 
     private static final DefaultRedisScript<Long> SKCKILL_SCRIPT ;
@@ -60,26 +60,36 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         SKCKILL_SCRIPT.setResultType(Long.class);
     }
 
+    /**
+     * 初始完成后，然后开启一个子线程（注解@PostConstruct）
+     * 负责执行数据库下单操作
+     */
     @PostConstruct
     public void init(){
         SECKILL_ORDER_EXECUTOR.submit(new VoucherOrderHandler());
     }
 
+    // 开启子线程执行数据库下单操作
     public class VoucherOrderHandler implements Runnable{
         @Override
         public void run(){
             while(true){
-                // 1. 获取阻塞队列的订单信息
+                // 1. 获取阻塞队列的订单信息（获取不到，直接阻塞【不用担心while（true）占用cpu资源】，知道有消息就从阻塞队列中获取）
                 try {
                     VoucherOrder voucherOrder = orderTasks.take();
                     handleVoucherOrder(voucherOrder);
-                } catch (InterruptedException e) {
+                } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
             }
         }
     }
 
+    /**
+     * 异步线程里的方法不需要返回结果（直接执行完成即可）
+     * 其实这里不用加锁，为了一个兜底方案
+     * @param voucherOrder
+     */
     private void handleVoucherOrder(VoucherOrder voucherOrder){
         // 1. 获取用户
         Long userId = voucherOrder.getUserId();
@@ -92,7 +102,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return;
         }
         try{
-            // 通过代理在非事务方法中调用事务方法
+            // 通过父类线程的代理在非事务方法中调用事务方法，也是异步线程的方法
             proxy.createVoucherOrder(voucherOrder);
         }finally{
             // unlock保证原子性
@@ -151,7 +161,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 //            lock.unlock();
 //        }
 //    }
-    IVoucherOrderService proxy;
+            //
+    private IVoucherOrderService proxy;// 主线程获取的代理
     @Override
     public Result addVoucherOrder(Long voucherId) {
         // 1. 执行lua脚本(有无购买资格)
@@ -178,9 +189,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         voucherOrder.setVoucherId(voucherId);
         // 2.6 放到阻塞队列
         orderTasks.add(voucherOrder);
-        // 2.7 获取代理对象
+        // 3. 获取代理对象
         proxy = (IVoucherOrderService)AopContext.currentProxy();
-        // 2.7 订单id
+        // 4. 订单id
         return Result.ok(orderId);
     }
 
@@ -218,6 +229,11 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 //            save(voucherOrder);
 //            return Result.ok(orderId);
 //    }
+
+    /**
+     * 操作数据库执行抢票扣减动作
+     * @param voucherOrder
+     */
 
     @Transactional // 修改、删除、添加等操作需要加上事务
     public  void createVoucherOrder(VoucherOrder voucherOrder){
