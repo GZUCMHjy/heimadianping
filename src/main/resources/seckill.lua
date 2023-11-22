@@ -12,7 +12,7 @@ local orderKey = "seckill:order:" .. userId
 
 -- 3. 脚本业务
 -- 3.1 判断库存是否充足
-if(tonumber(redid.call('get',stockKey)) < 0) then
+if(tonumber(redid.call('get',stockKey)) <= 0) then
     return 1
 end
 
@@ -24,7 +24,7 @@ end
 -- 扣减库存
 redis.call('incrby',stock,-1)
 -- 记录已经下过单
-redis.call('add',orderKey,userId)
+redis.call('sadd',orderKey,userId)
 
 return 0
 
