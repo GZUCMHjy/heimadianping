@@ -3,6 +3,8 @@
 local voucherId = ARGV[1]
 -- 1.2 用户id
 local userId = ARGV[2]
+-- 1.3 订单orderId
+local orderId = ARGV[3]
 
 -- 2. 数据key
 -- 2.1 库存key
@@ -25,7 +27,8 @@ end
 redis.call('incrby',stock,-1)
 -- 记录已经下过单
 redis.call('sadd',orderKey,userId)
-
+-- 发送消息到队列 队列名 stream.orders
+redis.call('xadd','stream.orders','*','userId',userId,'voucherId',voucherId,'id',orderId);
 return 0
 
 
