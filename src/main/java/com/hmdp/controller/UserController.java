@@ -1,7 +1,10 @@
 package com.hmdp.controller;
+import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
+import com.hmdp.entity.User;
 import com.hmdp.entity.UserInfo;
 import com.hmdp.service.IUserInfoService;
 import com.hmdp.service.IUserService;
@@ -64,12 +67,13 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    public Result me(){
-        //获取当前登录的用户并返回
-        UserDTO userDTO = UserHolder.getUser();
-//        Object user = session.getAttribute("user");
-//        stringRedisTemplate.opsForHash().get()
-        return Result.ok(userDTO);
+    public Result me(HttpSession session){
+        UserDTO userInfo = userService.getUserInfo(session);
+        if(userInfo == null){
+            log.error("获取信息失败");
+            return Result.fail("获取信息失败");
+        }
+        return Result.ok(userInfo);
     }
 
     @GetMapping("/info/{id}")
