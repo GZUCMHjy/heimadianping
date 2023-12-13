@@ -51,9 +51,9 @@ public class UserController {
      * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
      */
     @PostMapping("/login")
-    public Result login(@RequestBody LoginFormDTO loginForm, HttpSession session){
+    public Result login(@RequestBody LoginFormDTO loginForm){
         // TODO 实现登录功能
-        return userService.login(loginForm,session);
+        return userService.login(loginForm);
     }
 
     /**
@@ -68,12 +68,17 @@ public class UserController {
 
     @GetMapping("/me")
     public Result me(HttpSession session){
-        UserDTO userInfo = userService.getUserInfo(session);
-        if(userInfo == null){
+        UserDTO userDTO = userService.getUserInfo(session);
+        if(userDTO == null){
             log.error("获取信息失败");
             return Result.fail("获取信息失败");
         }
-        return Result.ok(userInfo);
+        return Result.ok(userDTO);
+        //获取当前登录的用户并返回
+//        UserDTO userDTO = UserHolder.getUser();
+//        Object user = session.getAttribute("user");
+//        stringRedisTemplate.opsForHash().get()
+//        return Result.ok(userDTO);
     }
 
     @GetMapping("/info/{id}")
@@ -88,5 +93,15 @@ public class UserController {
         info.setUpdateTime(null);
         // 返回
         return Result.ok(info);
+    }
+
+    @GetMapping("/{id}")
+    public Result queryUserById(@PathVariable("id") Long userId ){
+        User user = userService.getById(userId);
+        if(user == null){
+            return Result.ok();
+        }
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        return Result.ok(userDTO);
     }
 }

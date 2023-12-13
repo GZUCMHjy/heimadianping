@@ -12,6 +12,7 @@ import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
 
+import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -42,7 +43,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     @Resource
     private StringRedisTemplate stringRedisTemplate;
     /**
-     * 发送验证码
+     * 发送验证码（登录之前的操作）
      * @param phone
      * @param session
      * @return
@@ -70,7 +71,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     @Override
-    public Result login(LoginFormDTO loginFormDTO,HttpSession session) {
+    public Result login(LoginFormDTO loginFormDTO) {
         // 1. 校验手机号和验证码
         String phone = loginFormDTO.getPhone();
         if(RegexUtils.isPhoneInvalid(phone)){
@@ -90,17 +91,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             // 4. 不存在创建(注册)新用户
             user = createUserWithPhone(phone);
         }
+
         // 创建后，存入到session 也可以 先new一个userDTO 然后使用BeanUtils.copyProperties(user,userDTO)
         // spring框架自带的工具BeanUtils
         // 用户信息存入到session 改成 存入到 redis （采用Hash数据结构）
         // session.setAttribute("user", BeanUtil.copyProperties(user, UserDTO.class));
-        // token 由UUID生成
+        // token 由UUID生成(随机且唯一)
         String token = UUID.randomUUID().toString();
 
         // 将User对象转变成HashMap存储到Redis的Hash结构当中
-        // 存储力度降低 可以降低内存消耗（取出不需要的信息）
+        // 存储力度降低 可以降低内存消耗（取出不需要的信息）同时数据脱敏
         // user -> userDTO （source ——> target）
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+        UserHolder.saveUser(userDTO);
         // 用户信息写入到redis（可能会出现类型转换异常）
         // stringRedisTemplate需要key和value都是String类型 因此需要将其进行数据类型的转换
         Map<String, Object> userMap = BeanUtil.beanToMap(userDTO,new HashMap<>(),
@@ -110,6 +113,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // putAll 比 put更灵活 减少对Redis交互次数（读写）
         // 用户信息写入到Redis当中去
         String tokenKey = LOGIN_USER_KEY + token ;
+        // 相当与存入不同session（key和value都是不同的）
         stringRedisTemplate.opsForHash().putAll(tokenKey,userMap);
         // hash得要单独设置号有效时间
         // session也是有效期是30min

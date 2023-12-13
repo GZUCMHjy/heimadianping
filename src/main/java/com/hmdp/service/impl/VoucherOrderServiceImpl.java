@@ -26,8 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 
-import static jodd.util.ThreadUtil.sleep;
-
 /**
  * <p>
  *  服务实现类
@@ -59,6 +57,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
         private static final DefaultRedisScript<Long> SKCKILL_SCRIPT ;
 
+        // 初始化静态代码块，执行秒杀脚本
         static {
             SKCKILL_SCRIPT= new DefaultRedisScript<>();
             SKCKILL_SCRIPT.setLocation(new ClassPathResource("seckill.lua"));
@@ -80,8 +79,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
      * @param voucherId 优惠券Id
      * @return
      */
-    @Override
-        public Result addVoucherOrder(Long voucherId) {
+       @Override
+       public Result addVoucherOrder(Long voucherId) {
             // todo 获取不到用户id NPE
             Long userId = UserHolder.getUser().getId();
             long orderId = redisIdWorker.nextId("order");
@@ -103,12 +102,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.ok(orderId);
         }
 
-       public class VoucherOrderHandler implements Runnable {
-        String queueName = "stream.orders";
+    /**
+     * 子线程内部类
+     * 尝试读取消息队列信息
+     */
 
-       /**
-        * 子线程执行业务
-        */
+    public class VoucherOrderHandler implements Runnable {
+        // 消息队列 -> 消费组 -> 消费者
+        String queueName = "stream.orders";
         @Override
         public void run() {
             while (true) {
@@ -143,7 +144,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         private void handlePendingList() {
             while (true) {
                 try {
-                    // 1. 获取pendingList队列有无信息
+                    // 1. 读取pendingList队列有无信息
                     // 相当于 XREADGROUP GROUP g1 c1 COUNT 1 STREAMS stream.orders >
                     List<MapRecord<String, Object, Object>> list = stringRedisTemplate.opsForStream().read(
                             Consumer.from("g1", "c1"),
@@ -170,7 +171,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                     } catch (InterruptedException exception) {
                         exception.printStackTrace();
                     }
-
                 }
             }
         }

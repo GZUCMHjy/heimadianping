@@ -43,9 +43,9 @@ public class MvcConfig implements WebMvcConfigurer {
 
 
 
-//    @Override
-//    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-//        registry.addResourceHandler("doc.html")
-//                .addResourceLocations("classpath:/META-INF/resources/");
-//    }
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("doc.html")
+                .addResourceLocations("classpath:/META-INF/resources/");
+    }
 }
