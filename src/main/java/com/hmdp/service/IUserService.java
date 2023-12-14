@@ -22,7 +22,6 @@ public interface IUserService extends IService<User> {
 
     Result login(LoginFormDTO loginFormDTO);
 
-    UserDTO getUserInfo(HttpSession session);
 
 
 }

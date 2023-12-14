@@ -68,17 +68,12 @@ public class UserController {
 
     @GetMapping("/me")
     public Result me(HttpSession session){
-        UserDTO userDTO = userService.getUserInfo(session);
-        if(userDTO == null){
+        UserDTO user = UserHolder.getUser();
+        if(user == null){
             log.error("获取信息失败");
             return Result.fail("获取信息失败");
         }
-        return Result.ok(userDTO);
-        //获取当前登录的用户并返回
-//        UserDTO userDTO = UserHolder.getUser();
-//        Object user = session.getAttribute("user");
-//        stringRedisTemplate.opsForHash().get()
-//        return Result.ok(userDTO);
+        return Result.ok(user);
     }
 
     @GetMapping("/info/{id}")

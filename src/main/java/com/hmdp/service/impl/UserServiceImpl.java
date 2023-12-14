@@ -57,9 +57,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 2. 生成验证码
         String code = RandomUtil.randomNumbers(6);
         // 3. 保存验证码到session 换成 存（写）入早redis当中
-        // key和value “code” 和 code
-        // 用来代替UserHolder中的code，要不然没法获取个人信息
-        session.setAttribute("phone",phone);
         // key：LOGIN_CODE_KEY+phone
         // value: code
         // 写入redis一定要设置有效期！！！
@@ -81,7 +78,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         //  Object cache = session.getAttribute("code"); 有setAttribute就有getAttribute
         String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
         String code = loginFormDTO.getCode();
-        if(cacheCode == null || !cacheCode.toString().equals(code)){
+        if(cacheCode == null || !cacheCode.equals(code)){
             return Result.fail("验证码错误");
         }
         // 2. 根据手机号条件查询对应用户 one()
@@ -118,22 +115,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // hash得要单独设置号有效时间
         // session也是有效期是30min
         stringRedisTemplate.expire(tokenKey,LOGIN_USER_TTL,TimeUnit.MINUTES);
+        // 返回给前端的token
         return Result.ok(token);
     }
 
-    @Override
-    public UserDTO getUserInfo(HttpSession session) {
-        String phone = (String) session.getAttribute("phone");
-        if(phone != null){
-            User user = query().eq("phone", phone).one();
-            if(user == null){
-                return null;
-            }
-            UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-            return userDTO;
-        }
-        return null;
-    }
 
     /**
      * 根据手机号创建用户
